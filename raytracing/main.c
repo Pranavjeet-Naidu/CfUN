@@ -52,6 +52,46 @@ void generate_rays(struct Circle circle, struct Ray rays[RAYS_NUMBER])
 }
 
 
+void FillRays(SDL_Surface* surface, struct Ray rays[RAYS_NUMBER], Uint32 color, Uint32 blur_color, struct Circle object)
+{
+
+    double radius_squared = pow(object.r, 2);
+    for (int i=0; i<RAYS_NUMBER; i++)
+    {
+        struct Ray ray = rays[i];
+      
+        int end_of_screen = 0;
+        int object_hit = 0;
+
+        double step = 1; 
+        double x_draw = ray.x_start;
+        double y_draw = ray.y_start;
+        while ( !end_of_screen && !object_hit)
+        {
+            x_draw += step*cos(ray.angle);
+            y_draw += step*sin(ray.angle);
+
+            SDL_Rect ray_point = (SDL_Rect){x_draw,y_draw,RAY_THICKNESS, RAY_THICKNESS};
+            double blur_size = 3 * RAY_THICKNESS;
+            SDL_Rect ray_blur = (SDL_Rect){x_draw,y_draw,blur_size, blur_size};
+            SDL_FillRect(surface, &ray_point, color);
+            
+            if(x_draw < 0 || x_draw > WIDTH)
+                end_of_screen = 1;
+            if(y_draw <0 || y_draw > HEIGHT)
+                end_of_screen = 1;
+            
+            // Does the ray hit an object?
+            double distance_squared = pow(x_draw-object.x,2) + pow(y_draw-object.y,2);
+            if ( distance_squared < radius_squared )
+            {
+                break;
+            }
+            
+        }
+    }
+}
+
 int main()
 {
     SDL_Init(SDL_INIT_VIDEO);
