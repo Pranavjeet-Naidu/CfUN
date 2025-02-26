@@ -1,6 +1,4 @@
-I'll format the README for the HTTP Client project with clean Markdown:
-
-# Simple HTTP Client in C
+\# Simple HTTP Client in C
 
 This project demonstrates how to create a simple HTTP client in C using `getaddrinfo()` for domain name resolution and the `socket` API for network communication. It connects to a server (in this case, Yahoo), sends an HTTP GET request, and parses the response to display the headers and the body separately.
 
