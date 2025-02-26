@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <math.h>
+#include <stdbool.h>
 
 #define WIDTH 1200
 #define HEIGHT 600
@@ -12,33 +13,56 @@
 #define RAY_THICKNESS 2
 #define BLUR_THICKNESS 5
 
-struct Circle {
+typedef struct {
     double x;
     double y;
     double r;
-};
+    Uint32 color;
+} Circle;
 
-struct Ray {
+typedef struct {
     double x_start, y_start;
     double angle;
-};
+} Ray;
 
-void FillCircle(SDL_Surface* surface, struct Circle circle, Uint32 color) {
-    int radius_squared = (int)(circle.r * circle.r);
-    for (int x = (int)(circle.x - circle.r); x <= (int)(circle.x + circle.r); x++) {
-        for (int y = (int)(circle.y - circle.r); y <= (int)(circle.y + circle.r); y++) {
-            if ((x - circle.x) * (x - circle.x) + (y - circle.y) * (y - circle.y) <= radius_squared) {
-                SDL_Rect pixel = {x, y, 1, 1};
-                SDL_FillRect(surface, &pixel, color);
-            }
-        }
+// Function declarations
+void fill_circle(SDL_Surface* surface, Circle circle);
+void generate_rays(Circle light, Ray rays[RAYS_NUMBER]);
+void draw_thick_line(SDL_Surface* surface, int x0, int y0, int x1, int y1, Uint32 color, int thickness);
+void draw_rays(SDL_Surface* surface, Ray rays[RAYS_NUMBER], Circle object);
+
+void fill_circle(SDL_Surface* surface, Circle circle) {
+    // More efficient circle drawing algorithm
+    int radius = (int)circle.r;
+    int centerX = (int)circle.x;
+    int centerY = (int)circle.y;
+    
+    // Use horizontal scanlines for better performance
+    for (int y = -radius; y <= radius; y++) {
+        int height = sqrt(radius*radius - y*y);
+        int drawY = centerY + y;
+        
+        // Skip if outside screen bounds
+        if (drawY < 0 || drawY >= HEIGHT)
+            continue;
+            
+        int startX = centerX - height;
+        int endX = centerX + height;
+        
+        // Clamp to screen bounds
+        startX = startX < 0 ? 0 : startX;
+        endX = endX >= WIDTH ? WIDTH-1 : endX;
+        
+        // Draw horizontal line
+        SDL_Rect line = {startX, drawY, endX - startX + 1, 1};
+        SDL_FillRect(surface, &line, circle.color);
     }
 }
 
-void generate_rays(struct Circle circle, struct Ray rays[RAYS_NUMBER]) {
+void generate_rays(Circle light, Ray rays[RAYS_NUMBER]) {
     for (int i = 0; i < RAYS_NUMBER; i++) {
         double angle = ((double)i / RAYS_NUMBER) * 2 * M_PI;
-        rays[i] = (struct Ray){circle.x, circle.y, angle};
+        rays[i] = (Ray){light.x, light.y, angle};
     }
 }
 
@@ -49,11 +73,14 @@ void draw_thick_line(SDL_Surface* surface, int x0, int y0, int x1, int y1, Uint3
     int half_thick = thickness / 2;
 
     while (1) {
+        // Draw square centered at current pixel
         for (int i = -half_thick; i <= half_thick; i++) {
             for (int j = -half_thick; j <= half_thick; j++) {
-                if (x0 + i >= 0 && x0 + i < WIDTH && y0 + j >= 0 && y0 + j < HEIGHT) {
-                    SDL_Rect pixel = {x0 + i, y0 + j, 1, 1};
-                    SDL_FillRect(surface, &pixel, color);
+                int drawX = x0 + i;
+                int drawY = y0 + j;
+                
+                if (drawX >= 0 && drawX < WIDTH && drawY >= 0 && drawY < HEIGHT) {
+                    ((Uint32*)surface->pixels)[drawY * surface->w + drawX] = color;
                 }
             }
         }
@@ -65,7 +92,7 @@ void draw_thick_line(SDL_Surface* surface, int x0, int y0, int x1, int y1, Uint3
     }
 }
 
-void DrawRays(SDL_Surface* surface, struct Ray rays[RAYS_NUMBER], struct Circle object) {
+void draw_rays(SDL_Surface* surface, Ray rays[RAYS_NUMBER], Circle object) {
     for (int i = 0; i < RAYS_NUMBER; i++) {
         double x0 = rays[i].x_start;
         double y0 = rays[i].y_start;
@@ -90,18 +117,26 @@ void DrawRays(SDL_Surface* surface, struct Ray rays[RAYS_NUMBER], struct Circle 
 
         // Calculate intersection with screen boundaries
         double t_screen = INFINITY;
+        
+        // Check horizontal boundaries
         if (cos(angle) != 0) {
             double tx = cos(angle) > 0 ? (WIDTH - x0)/cos(angle) : (-x0)/cos(angle);
             if (tx > 0) {
                 double y = y0 + tx * sin(angle);
-                if (y >= 0 && y <= HEIGHT) t_screen = fmin(t_screen, tx);
+                if (y >= 0 && y <= HEIGHT) {
+                    t_screen = fmin(t_screen, tx);
+                }
             }
         }
+        
+        // Check vertical boundaries
         if (sin(angle) != 0) {
             double ty = sin(angle) > 0 ? (HEIGHT - y0)/sin(angle) : (-y0)/sin(angle);
             if (ty > 0) {
                 double x = x0 + ty * cos(angle);
-                if (x >= 0 && x <= WIDTH) t_screen = fmin(t_screen, ty);
+                if (x >= 0 && x <= WIDTH) {
+                    t_screen = fmin(t_screen, ty);
+                }
             }
         }
 
@@ -124,43 +159,110 @@ void DrawRays(SDL_Surface* surface, struct Ray rays[RAYS_NUMBER], struct Circle 
 }
 
 int main() {
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window* window = SDL_CreateWindow("Raytracing 2.0", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        return 1;
+    }
+    
+    SDL_Window* window = SDL_CreateWindow("Raytracing 2.0", 
+                                        SDL_WINDOWPOS_CENTERED, 
+                                        SDL_WINDOWPOS_CENTERED, 
+                                        WIDTH, HEIGHT, 0);
+    if (!window) {
+        printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+    
     SDL_Surface* surface = SDL_GetWindowSurface(window);
+    if (!surface) {
+        printf("Surface could not be created! SDL_Error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
 
-    struct Circle light = {200, 200, 15};
-    struct Circle obstacle = {550, 300, 140};
-    struct Ray rays[RAYS_NUMBER];
+    Circle light = {200, 200, 15, COLOR_WHITE};
+    Circle obstacle = {550, 300, 140, COLOR_WHITE};
+    Ray rays[RAYS_NUMBER];
     generate_rays(light, rays);
 
     double obstacle_speed = 4;
-    int running = 1;
+    bool running = true;
+    bool light_dragging = false;
+    
+    // Frame timing variables
+    Uint32 frameStart, frameTime;
+    const int FPS = 60;
+    const int frameDelay = 1000 / FPS;
+    
     while (running) {
+        frameStart = SDL_GetTicks();
+        
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) running = 0;
-            if (event.type == SDL_MOUSEMOTION && event.motion.state) {
-                light.x = event.motion.x;
-                light.y = event.motion.y;
-                generate_rays(light, rays);
+            switch (event.type) {
+                case SDL_QUIT:
+                    running = false;
+                    break;
+                    
+                case SDL_MOUSEBUTTONDOWN:
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        int mouseX = event.button.x;
+                        int mouseY = event.button.y;
+                        
+                        // Check if clicked on light
+                        double dx = mouseX - light.x;
+                        double dy = mouseY - light.y;
+                        if (sqrt(dx*dx + dy*dy) <= light.r) {
+                            light_dragging = true;
+                        }
+                    }
+                    break;
+                    
+                case SDL_MOUSEBUTTONUP:
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        light_dragging = false;
+                    }
+                    break;
+                    
+                case SDL_MOUSEMOTION:
+                    if (light_dragging) {
+                        light.x = event.motion.x;
+                        light.y = event.motion.y;
+                        generate_rays(light, rays);
+                    }
+                    break;
+                    
+                case SDL_KEYDOWN:
+                    if (event.key.keysym.sym == SDLK_ESCAPE) {
+                        running = false;
+                    }
+                    break;
             }
         }
 
         // Update obstacle position
         obstacle.y += obstacle_speed;
-        if (obstacle.y + obstacle.r > HEIGHT || obstacle.y - obstacle.r < 0)
+        if (obstacle.y + obstacle.r > HEIGHT || obstacle.y - obstacle.r < 0) {
             obstacle_speed *= -1;
+        }
 
         // Clear screen
         SDL_FillRect(surface, NULL, COLOR_BLACK);
         
         // Draw elements
-        DrawRays(surface, rays, obstacle);
-        FillCircle(surface, light, COLOR_WHITE);
-        FillCircle(surface, obstacle, COLOR_WHITE);
+        draw_rays(surface, rays, obstacle);
+        fill_circle(surface, obstacle);
+        fill_circle(surface, light);
 
         SDL_UpdateWindowSurface(window);
-        SDL_Delay(10);
+        
+        // Frame timing
+        frameTime = SDL_GetTicks() - frameStart;
+        if (frameDelay > frameTime) {
+            SDL_Delay(frameDelay - frameTime);
+        }
     }
 
     SDL_DestroyWindow(window);
