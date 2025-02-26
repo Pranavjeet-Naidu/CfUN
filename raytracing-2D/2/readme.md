@@ -12,6 +12,9 @@ An enhanced version of the raytracing simulation with better performance and vis
 - Improved Performance 
 - This version uses mathematical calculations to determine ray-circle intersections directly, rather than tracing pixels step by step, resulting in better performance and more accurate results.
 
+![250226_16h41m31s_screenshot](https://github.com/user-attachments/assets/7442ca5f-a4ba-4469-9c23-a675d206daf2)
+
+
 ## How to Run
 ```bash
 # Compile the code
