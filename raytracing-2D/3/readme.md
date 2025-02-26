@@ -9,6 +9,10 @@ A sophisticated 2D raytracing simulation featuring multiple objects and ray refl
 - Interactive dragging of all objects
 - This version implements proper reflection physics allowing rays to bounce off objects based on their reflectivity properties. The code uses batch processing to improve performance and supports up to 3 reflection bounces per ray
 
+
+![250226_16h43m28s_screenshot](https://github.com/user-attachments/assets/88859f86-d393-4fc6-89f7-a8ac0e60d175)
+
+
 ## How to Run
 ```bash
 # Compile the code
