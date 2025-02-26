@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>  // Add TTF library for text rendering
 #include <assert.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define WIDTH 900
 #define HEIGHT 600
@@ -15,10 +17,17 @@
 #define COLOR_GRID 0x1f1f1f1f
 #define COLOR_WHITE 0xffffffff
 #define COLOR_APPLE 0x00ff0000
+#define COLOR_GOLDEN_APPLE 0xFFD700FF  // Golden apple for bonus points
+#define COLOR_GAME_OVER 0xFF00FFFF     // Game over text color
 
 #define SNAKE(x,y) fill_cell(psurface,x,y,COLOR_WHITE) 
-#define APPLE(x,y) fill_cell(psurface,x,y,COLOR_APPLE)
+#define APPLE(x,y,color) fill_cell(psurface,x,y,color)
 #define DRAW_GRID draw_grid(psurface)
+
+#define INITIAL_DELAY 200
+#define MIN_DELAY 50
+#define DELAY_DECREMENT 5
+#define BONUS_APPLE_CHANCE 5  // 1 in 5 chance for bonus apple
 
 /* Like a LinkedList */
 struct SnakeElement
@@ -37,7 +46,20 @@ struct Direction
 struct Apple
 {
     int x,y;
+    int bonus;  // Whether this is a bonus apple (worth more points)
+    Uint32 color;
 };
+
+struct GameState {
+    int score;
+    int delay;
+    int is_game_over;
+    int game_started;  // Added flag to track game start
+};
+
+// Function declarations
+void render_text(SDL_Surface* psurface, TTF_Font* font, const char* text, SDL_Color color, int x, int y);
+void show_game_over(SDL_Surface* psurface, TTF_Font* font, int score);
 
 int draw_grid(SDL_Surface* psurface)
 {
@@ -56,6 +78,37 @@ void fill_cell(SDL_Surface* psurface, int x, int y, Uint32 color)
     SDL_FillRect(psurface, &rect, color);
 }
 
+// Render text to the surface
+void render_text(SDL_Surface* psurface, TTF_Font* font, const char* text, SDL_Color color, int x, int y)
+{
+    SDL_Surface* text_surface = TTF_RenderText_Solid(font, text, color);
+    if (text_surface == NULL) {
+        printf("Failed to render text: %s\n", TTF_GetError());
+        return;
+    }
+
+    SDL_Rect dest = {x, y, text_surface->w, text_surface->h};
+    SDL_BlitSurface(text_surface, NULL, psurface, &dest);
+    SDL_FreeSurface(text_surface);
+}
+
+// Show game over screen
+void show_game_over(SDL_Surface* psurface, TTF_Font* font, int score)
+{
+    SDL_Rect rect = {0, 0, WIDTH, HEIGHT};
+    SDL_FillRect(psurface, &rect, COLOR_BLACK);
+
+    SDL_Color color = {255, 0, 255, 255};
+    char game_over_text[50];
+    sprintf(game_over_text, "GAME OVER");
+    render_text(psurface, font, game_over_text, color, WIDTH/2 - 150, HEIGHT/2 - 60);
+
+    char score_text[50];
+    sprintf(score_text, "Final Score: %d", score);
+    render_text(psurface, font, score_text, color, WIDTH/2 - 120, HEIGHT/2);
+
+    render_text(psurface, font, "Press ESC to quit", color, WIDTH/2 - 150, HEIGHT/2 + 60);
+}
 
 size_t snake_size(struct SnakeElement **ppsnake)
 {
@@ -149,12 +202,19 @@ void move_snake(struct SnakeElement **ppsnake, struct Direction *pdirection)
     printf("Snake size =%zu\n", size);
 }
 
-
-
 void reset_apple(struct SnakeElement *psnake, struct Apple *papple)
 {
     papple->x = COLUMNS * ((double) rand() / RAND_MAX);
     papple->y = ROWS * ((double) rand() / RAND_MAX);
+
+    // Randomly decide if this is a bonus apple
+    if (rand() % BONUS_APPLE_CHANCE == 0) {
+        papple->bonus = 1;
+        papple->color = COLOR_GOLDEN_APPLE;
+    } else {
+        papple->bonus = 0;
+        papple->color = COLOR_APPLE;
+    }
 
     /* If apple coordinates collide with snake, try again */
     struct SnakeElement *pcurrent = psnake;
@@ -210,17 +270,30 @@ int check_collision(struct SnakeElement **ppsnake)
 int main()
 {
     printf("Hello Snake\n");
+    srand(time(NULL));  // Initialize random seed
 
+    // Initialize SDL and TTF
     SDL_Init(SDL_INIT_VIDEO);
+    TTF_Init();
+    
     SDL_Window* window = SDL_CreateWindow("Classic Snake", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
-
     SDL_Surface* psurface = SDL_GetWindowSurface(window);
+    
+    // Load font
+    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 28);
+    if (!font) {
+        printf("Failed to load font: %s\n", TTF_GetError());
+        font = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans-Bold.ttf", 28); // Try another common font
+        if (!font) {
+            printf("Failed to load backup font, continuing without text\n");
+        }
+    }
 
     SDL_Event event;
 
-    struct SnakeElement *psnake = malloc(sizeof(struct SnakeElement *));
-    struct SnakeElement *psnakeTail = malloc(sizeof(struct SnakeElement *));
-    struct SnakeElement *psnakeTail2 = malloc(sizeof(struct SnakeElement *));
+    struct SnakeElement *psnake = malloc(sizeof(struct SnakeElement));
+    struct SnakeElement *psnakeTail = malloc(sizeof(struct SnakeElement));
+    struct SnakeElement *psnakeTail2 = malloc(sizeof(struct SnakeElement));
 
     psnake->x = 5;
     psnake->y=5;
@@ -234,18 +307,17 @@ int main()
     psnakeTail2->y=7;
     psnakeTail2->pnext=NULL;
 
-    print_snake(&psnake);
-
-    
-
     struct SnakeElement **ppsnake = &psnake;
     struct Direction direction = {0,0};
     struct Direction *pdirection = &direction;
-    struct Apple apple;
+    struct Apple apple = {0, 0, 0, COLOR_APPLE};
     struct Apple *papple = &apple;
     reset_apple(psnake, papple);
 
+    struct GameState gameState = {0, INITIAL_DELAY, 0, 0};  // Initialize game_started to 0
+
     SDL_Rect override_rect = {0,0,WIDTH,HEIGHT};
+    SDL_Color score_color = {255, 255, 255, 255};
 
     int game = 1;
     while(game)
@@ -256,52 +328,95 @@ int main()
                 game = 0;   
             if (event.type == SDL_KEYDOWN)
             {
-                direction = (struct Direction) {0,0};
-                if (event.key.keysym.sym == SDLK_RIGHT)
-                    direction.dx = 1;
-                if (event.key.keysym.sym == SDLK_LEFT)
-                    direction.dx = -1;
-                if (event.key.keysym.sym == SDLK_UP)
-                    direction.dy = -1;
-                if (event.key.keysym.sym == SDLK_DOWN)
-                    direction.dy = +1;
+                if (gameState.is_game_over) {
+                    if (event.key.keysym.sym == SDLK_ESCAPE)
+                        game = 0;
+                } else {
+                    // Only change direction when game is active
+                    if (event.key.keysym.sym == SDLK_RIGHT && direction.dx != -1) {
+                        direction = (struct Direction) {1, 0};
+                        gameState.game_started = 1;
+                    }
+                    if (event.key.keysym.sym == SDLK_LEFT && direction.dx != 1) {
+                        direction = (struct Direction) {-1, 0};
+                        gameState.game_started = 1;
+                    }
+                    if (event.key.keysym.sym == SDLK_UP && direction.dy != 1) {
+                        direction = (struct Direction) {0, -1};
+                        gameState.game_started = 1;
+                    }
+                    if (event.key.keysym.sym == SDLK_DOWN && direction.dy != -1) {
+                        direction = (struct Direction) {0, 1};
+                        gameState.game_started = 1;
+                    }
+                }
             }
         }
-
-        //print_snake(ppsnake);
 
         SDL_FillRect(psurface, &override_rect, COLOR_BLACK);
 
-        printf("Moving snake\n");
-        move_snake(ppsnake, pdirection);
-        if(check_collision(ppsnake))
-        {
-            printf("Collision! Game Over\n");
-            
-            /* Free memory */
-            struct SnakeElement *pcurrent = *ppsnake;
-            struct SnakeElement *pnext;
-            while (pcurrent->pnext != NULL)
-            {
-                pnext = pcurrent->pnext;
-                free(pcurrent);
-                pcurrent = pnext;
+        if (!gameState.is_game_over) {
+            if (gameState.game_started) {
+                move_snake(ppsnake, pdirection);
+                
+                if(check_collision(ppsnake)) {
+                    printf("Collision! Game Over\n");
+                    gameState.is_game_over = 1;
+                    /* Free memory handled at end of game */
+                }
+                else {
+                    if (psnake->x == papple->x && psnake->y == papple->y) {
+                        // Add score based on apple type
+                        gameState.score += papple->bonus ? 10 : 1;
+                        
+                        // Make game faster as score increases
+                        if (gameState.delay > MIN_DELAY) {
+                            gameState.delay -= DELAY_DECREMENT;
+                        }
+                        
+                        reset_apple(psnake, papple);
+                        lengthen_snake(ppsnake, pdirection);
+                    }
+                }
             }
-            free(pnext);
-            game = 0;
-        }
 
-        if (psnake->x == papple->x && psnake->y == papple->y)
-        {
-            reset_apple(psnake, papple);
-            lengthen_snake(ppsnake, pdirection);
-        }
+            APPLE(papple->x, papple->y, papple->color);
+            draw_snake(psurface, ppsnake); 
+            DRAW_GRID;
 
-        APPLE(papple->x, papple->y);
-        draw_snake(psurface, ppsnake); 
-        DRAW_GRID;
+            // Draw score
+            char score_text[20];
+            sprintf(score_text, "Score: %d", gameState.score);
+            if (font) {
+                render_text(psurface, font, score_text, score_color, 10, 10);
+            }
+        } else {
+            // Game over screen
+            if (font) {
+                show_game_over(psurface, font, gameState.score);
+            }
+        }
 
         SDL_UpdateWindowSurface(window);
-        SDL_Delay(200);
-    } 
+        SDL_Delay(gameState.is_game_over ? 100 : gameState.delay);
+    }
+
+    // Free memory
+    struct SnakeElement *pcurrent = *ppsnake;
+    struct SnakeElement *pnext;
+    while (pcurrent != NULL)
+    {
+        pnext = pcurrent->pnext;
+        free(pcurrent);
+        pcurrent = pnext;
+    }
+
+    if (font) {
+        TTF_CloseFont(font);
+    }
+    TTF_Quit();
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    
+    return 0;
 }
