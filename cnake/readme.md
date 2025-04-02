@@ -32,6 +32,8 @@ gcc cnake.c -o cnake -lSDL2 -lSDL2_ttf -lm
 
 ## Gameplay
 
+![250226_17h13m27s_screenshot](https://github.com/user-attachments/assets/15d82a1f-2404-449f-b28d-31b07142e463)
+
 - Control the snake using the arrow keys (↑, ↓, ←, →)
 - Eat red apples to grow and increase your score
 - Regular apples are worth 1 point
