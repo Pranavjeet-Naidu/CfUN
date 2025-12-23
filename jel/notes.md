@@ -6,12 +6,14 @@
 
 - struct termios raw - basically a struct that is used to control the parameters of a terminal ( here , we call and refer it as raw )
   mostly has these members:
-tcflag_t c_iflag: Input modes (e.g., handling of break conditions, parity errors, flow control).
-tcflag_t c_oflag: Output modes (e.g., post-processing, newline translation, delays).
-tcflag_t c_cflag: Control modes (e.g., character size, stop bits, modem control, hardware flow control).
-tcflag_t c_lflag: Local modes (e.g., enabling signals, canonical mode, character echoing).
+  tcflag_t c_iflag: Input modes (e.g., handling of break conditions, parity errors, flow control).
+  tcflag_t c_oflag: Output modes (e.g., post-processing, newline translation, delays).
+  tcflag_t c_cflag: Control modes (e.g., character size, stop bits, modem control, hardware flow control).
+  tcflag_t c_lflag: Local modes (e.g., enabling signals, canonical mode, character echoing).
 
-tcsetattr(filedes,when,termios struct) -> function to set the attributes
+- tcsetattr(filedes,when,termios struct) -> function to set the attributes
 we also have tcgetattr(filedes,termios struct)
 
-here we use TCSAFLUSH for when -> basically makes changes to the struct after all the output is written and then discards the input
+  -here we use TCSAFLUSH for when -> basically makes changes to the struct after all the output is written and then discards the input
+
+- iscntrl() -> test whether something is a control char(nonprintable chars)
