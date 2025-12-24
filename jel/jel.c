@@ -1,3 +1,4 @@
+/*** includes ***/
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -5,7 +6,12 @@
 #include <unistd.h>
 #include <termios.h>
 
+
+/*** data ***/
+
 struct termios orig_termios; //acts as the template struct to use (global variable)
+
+/*** terminal ***/
 
 //error handling , perror looks at 'errno' to get context
 void die(const char*s){
@@ -29,6 +35,10 @@ void enableRawMode(){
 
   if (tcsetattr(STDIN_FILENO,TCSAFLUSH, &raw) == -1) die("tcsetattr"); 
 }
+
+
+/*** init ***/
+
 int main(){
   enableRawMode();
 
