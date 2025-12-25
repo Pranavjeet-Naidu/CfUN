@@ -21,3 +21,5 @@ we also have tcgetattr(filedes,termios struct)
 -//ISIG is for Ctrl-C,Z
   //IEXTEN is for V,O
 ICRNL -> Ctrl-M
+ioctl() -> input output control function
+TIOCGWINSZ-> terminal ioctl , get window size
