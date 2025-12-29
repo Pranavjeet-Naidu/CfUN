@@ -15,6 +15,8 @@
 we also have tcgetattr(filedes,termios struct)
 
   -here we use TCSAFLUSH for when -> basically makes changes to the struct after all the output is written and then discards the input
+-//x1b [ J -> 27 followed by [ , then J to clear screen , 2 for entire screen , this is from VT100 escape sequences
+- // the [ is used for escape chars, H is for positioning the cursor ,
 
 - iscntrl() -> test whether something is a control char(nonprintable chars)
 
