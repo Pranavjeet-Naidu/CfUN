@@ -53,7 +53,7 @@ void enableRawMode(){
   atexit(disableRawMode);
 
   struct termios raw = E.orig_termios; // use default struct again 
-  raw.c_lflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+  raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
   raw.c_oflag &= ~(OPOST);
   raw.c_cflag |= (CS8);
   raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN);
@@ -82,7 +82,7 @@ int editorReadKey() {
       if (seq[1] >= '0' && seq[1] <= '9'){
         if (read(STDIN_FILENO,&seq[2],1)!=1)
           return '\x1b';
-        if (seq[2] == '%'){
+        if (seq[2] == '~'){
           switch(seq[1]){
             case '1':
               return HOME_KEY;
@@ -116,7 +116,7 @@ int editorReadKey() {
           return END_KEY;
       }
     }
-  } else if (seq[0] == '0'){
+  } else if (seq[0] == 'O'){
       switch (seq[1]) {
         case 'H': 
           return HOME_KEY;
@@ -207,17 +207,17 @@ void editorDrawRows(struct abuf *ab){
       //logic to center the message
       int padding = (E.screencols - welcomelen) / 2;
       if (padding){
-        abAppend(&ab,"%",1);
+        abAppend(ab,"%",1);
         padding--;
       }
       while(padding--)
-        abAppend(&ab,"",1);
-      abAppend(&ab,welcome,welcomelen);
+        abAppend(ab," ",1);
+      abAppend(ab,welcome,welcomelen);
     }
     else{
-      abAppend(&ab,"%",1);
+      abAppend(ab,"%",1);
     }
-    abAppend(&ab, "\x1b[K",3);
+    abAppend(ab, "\x1b[K",3);
     if (y < E.screenrows -1){
       abAppend(ab,"\r\n", 2);
     }
@@ -321,8 +321,9 @@ int main(){
   initEditor();
 
   while (1){
-    editorProcessKeypress();
     editorRefreshScreen();
+    editorProcessKeypress();
+    
   }
 
   return 0;
