@@ -316,18 +316,14 @@ void editorDrawRows(struct abuf *ab){
   for(y=0;y<E.screenrows;y++){
     int filerow = y + E.rowoff;
     if(filerow >= E.numrows){
-      if(E.numrows == 0 && y==E.screenrows/3){
+      if(E.numrows == 0 && y == 0){
         char welcome[80];
         int welcomelen = snprintf(welcome,sizeof(welcome),"Jel");
         if (welcomelen > E.screencols)
           welcomelen = E.screencols;
         //logic to center the message
         int padding = (E.screencols - welcomelen) / 2;
-        if (padding){
-          abAppend(ab,"%",1);
-          padding--;
-        }
-        while(padding--)
+        while (padding--)
           abAppend(ab," ",1);
         abAppend(ab,welcome,welcomelen);
       } else{
@@ -344,10 +340,20 @@ void editorDrawRows(struct abuf *ab){
     }
 
     abAppend(ab, "\x1b[K",3);
-    if (y < E.screenrows -1){
-      abAppend(ab,"\r\n", 2);
-    }
+    abAppend(ab,"\r\n", 2);
+    
   }
+}
+
+void editorDrawStatusBar(struct abuf *ab){
+  abAppend(ab, "\x1b[7m",4); 
+
+  int len = 0;
+  while(len < E.screencols){
+    abAppend(ab," ",1);
+    len++;
+  }
+  abAppend(ab, "\x1b[m",3); 
 }
 
 void editorRefreshScreen(){
@@ -474,6 +480,7 @@ void initEditor(){
   E.row = NULL;
 
   if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+  E.screenrows -= 1;
 }
 int main(int argc, char *argv[]){
   enableRawMode();
