@@ -268,6 +268,16 @@ void editorRowInsertChar(erow *row, int at, int c){
   E.dirty++;
 }
 
+void editorRowDelChar(erow *row, int at){
+  if (at <0 || at>= row->size)
+    return;
+  memmove(&row->chars[at], &row->chars[at+1],row->size - at);
+  row->size--;
+  editorUpdateRow(row);
+  E.dirty++;
+}
+
+
 /*** editor operations ***/
 
 void editorInsertChar(int c){
@@ -278,6 +288,15 @@ void editorInsertChar(int c){
   E.cx++;
 } 
 
+void editorDelChar(){
+  if (E.cy == E.numrows)
+    return;
+  erow *row = &E.row[E.cy];
+  if(E.cx >0){
+    editorRowDelChar(row, E.cx -1 );
+    E.cx--;
+  }
+}
 /*** file i/o ***/
 char *editorRowsToString(int *buflen){
   int totlen = 0;
@@ -565,10 +584,15 @@ void editorProcessKeypress(){
       if (E.cy < E.numrows)
         E.cx = E.row[E.cy].size;
       break;
+
     case BACKSPACE:
+
     case CTRL_KEY('h'):
-    case DEL_KEY:
-      //TODO
+
+    case DEL_KEY: // useless on my mac lol if i didnt have this mapped to backspace as well
+      if (c == DEL_KEY)
+        editorMoveCursor(ARROW_RIGHT);
+        editorDelChar();
       break;  
 
     case PAGE_UP:
@@ -603,6 +627,8 @@ void editorProcessKeypress(){
       editorInsertChar(c);
       break;
   }
+
+  quit_times = JEL_QUIT_TIMES; // reset back if anything other than ctrl-q is pressed
 }
 
 /*** init ***/
