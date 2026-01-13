@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <fcntl.h>
+#include <stdarg.h>
+
 
 
 
@@ -391,7 +393,7 @@ void editorSave(){
     close(fd);
   }
   free(buf);
-  editorSetStatusMessage("Cant't save! I/O error: %s", sterror(errno));
+  editorSetStatusMessage("Cant't save! I/O error: %s", strerror(errno));
 }
 
 // idea for later: write to a new, temporary file, and then rename that file to the actual file the user wants to overwrite, and they’ll carefully check for errors through the whole process.
