@@ -25,7 +25,7 @@
 #define _GNU_SOURCE
 #define ABUF_INIT {NULL,0} // acts as constructor for abuf type
 #define JEL_TAB_STOP 8 
-#define JEL_QUIT_TIMES 2
+#define JEL_QUIT_TIMES 1
 
 
 enum editorKey{
@@ -227,15 +227,18 @@ void editorUpdateRow(erow *row){
     } else{
       row->render[idx++] = row->chars[j];
     }
-    row->render[idx++] = '\0';
-    row->rsize = idx;
   }
+  row->render[idx] = '\0';
+  row->rsize = idx;
+  
 }
 
-void editorAppendRow(char *s, size_t len){
-  E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
-   
-  int at = E.numrows;
+void editorInsertRow(int at,char *s, size_t len){
+  if (at <0 || at > E.numrows)
+    return;
+  E.row =  realloc(E.row,sizeof(erow)*(E.numrows +1));
+  memmove(&E.row[at+1],&E.row[at],sizeof(erow)*(E.numrows-at));
+
   E.row[at].size = len;
   E.row[at].chars = malloc(len + 1);
   memcpy(E.row[at].chars, s, len);
@@ -243,6 +246,7 @@ void editorAppendRow(char *s, size_t len){
 
   E.row[at].rsize = 0;
   E.row[at].render = NULL;
+  editorUpdateRow(&E.row[at]);
 
   E.numrows++;
   E.dirty++; // instead of treating dirty as a bool, maybe we can use this value to see how dirty the file is ?
@@ -307,11 +311,26 @@ void editorRowAppendString(erow *row,char*s,size_t len){
 
 void editorInsertChar(int c){
   if (E.cy == E.numrows){
-    editorAppendRow("",0);
+    editorInsertRow(E.numrows,"",0);
   }
   editorRowInsertChar(&E.row[E.cy], E.cx, c);
   E.cx++;
 } 
+
+void editorInsertNewLine(){
+  if (E.cx == 0){
+    editorInsertRow(E.cy,"",0);
+  } else{
+    erow*row = &E.row[E.cy];
+    editorInsertRow(E.cy+1,&row->chars[E.cx],row->size-E.cx);
+    row = &E.row[E.cy];
+    row->size = E.cx;
+    row->chars[row->size] = '\0';
+    editorUpdateRow(row);
+  }
+  E.cy++;
+  E.cx = 0;
+}
 
 void editorDelChar(){
   if (E.cy == E.numrows)
@@ -364,7 +383,7 @@ void editorOpen(char *filename){
     while (linelen > 0 && (line[linelen - 1] == '\n' || 
                             line[linelen - 1] == '\r'))
       linelen--;
-    editorAppendRow(line,linelen);
+    editorInsertRow(E.numrows,line,linelen);
 }
   free(line);
   fclose(fp);
@@ -381,7 +400,7 @@ void editorSave(){
 
   int fd = open(E.filename, O_RDWR | O_CREAT, 0644);
   if (fd != -1){
-    if(ftruncate(fd,len) == len){
+    if(ftruncate(fd,len) != -1){
       if(write(fd,buf,len) == len){
         close(fd);
         free(buf);
@@ -592,6 +611,7 @@ void editorProcessKeypress(){
 
   switch(c){
     case '\r':
+      editorInsertNewLine();
       break;
     case CTRL_KEY('q'):
       if(E.dirty && quit_times > 0){
