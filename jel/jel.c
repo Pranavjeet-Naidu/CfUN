@@ -54,9 +54,10 @@ struct editorConfig{
   int screenrows;
   int screencols;
   int numrows;
-  erow *row;
+  int dirty;
   char *filename;
   char statusmsg[80];
+  erow *row;
   time_t statusmsg_time;
   struct termios orig_termios; //acts as the template struct to use (global variable)
 };
@@ -240,6 +241,7 @@ void editorAppendRow(char *s, size_t len){
   E.row[at].render = NULL;
 
   E.numrows++;
+  E.dirty++; // instead of treating dirty as a bool, maybe we can use this value to see how dirty the file is ?
 }
 
 int editorRowCxToRx(erow *row, int cx){
@@ -261,6 +263,7 @@ void editorRowInsertChar(erow *row, int at, int c){
   row->size++;
   row->chars[at] = c;
   editorUpdateRow(row);
+  E.dirty++;
 }
 
 /*** editor operations ***/
@@ -304,7 +307,6 @@ void editorOpen(char *filename){
   size_t linecap = 0;  
   ssize_t linelen;
   while ((linelen = getline(&line,&linecap,fp)) != -1) {
-  if (linelen == -1) {
     while (linelen > 0 && (line[linelen - 1] == '\n' || 
                             line[linelen - 1] == '\r'))
       linelen--;
@@ -312,8 +314,9 @@ void editorOpen(char *filename){
 }
   free(line);
   fclose(fp);
+  E.dirty = 0;
 }
-}
+
 
 void editorSave(){
   if (E.filename == NULL)
@@ -328,6 +331,7 @@ void editorSave(){
       if(write(fd,buf,len) == len){
         close(fd);
         free(buf);
+        E.dirty = 0;
         editorSetStatusMessage("%d bytes written to disk", len);
         return;
       }
@@ -421,8 +425,9 @@ void editorDrawRows(struct abuf *ab){
 void editorDrawStatusBar(struct abuf *ab){
   abAppend(ab, "\x1b[7m",4); 
   char status[80], rstatus[80];
-  int len = sprintf(status, sizeof(status), "%.20s - %d lines", 
-    E.filename ? E.filename : "[No Name]", E.numrows);
+  int len = snprintf(status, sizeof(status), "%.20s - %d lines %s", 
+    E.filename ? E.filename : "[No Name]", E.numrows,
+    E.dirty ? "(modified)" : "");
   int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numrows);
   if (len > E.screencols) 
     len = E.screencols;
@@ -599,6 +604,7 @@ void initEditor(){
   E.rowoff = 0;
   E.rx = 0;
   E.coloff = 0;
+  E.dirty = 0;
   E.numrows = 0;
   E.row = NULL;
   E.filename = NULL;
@@ -606,6 +612,7 @@ void initEditor(){
   if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
   E.screenrows -= 2; 
 }
+
 int main(int argc, char *argv[]){
   enableRawMode();
   initEditor();
