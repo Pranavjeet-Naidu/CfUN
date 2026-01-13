@@ -21,8 +21,10 @@
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #define _GNU_SOURCE
-#define ABUF_INIT {NULL,0}
-#define KILO_TAB_STOP 8 // acts as constructor for abuf type
+#define ABUF_INIT {NULL,0} // acts as constructor for abuf type
+#define JEL_TAB_STOP 8 
+#define JEL_QUIT_TIMES 2
+
 
 enum editorKey{
   BACKSPACE = 127,
@@ -213,12 +215,12 @@ void editorUpdateRow(erow *row){
       tabs++;
 
   free(row->render);
-  row->render = malloc(row->size + tabs*(KILO_TAB_STOP - 1)+ 1);
+  row->render = malloc(row->size + tabs*(JEL_TAB_STOP - 1)+ 1);
   int idx = 0;
   for (j=0;j<row->size;j++){
     if(row->chars[j] == '\t'){
       row->render[idx++] = ' ';
-      while (idx % KILO_TAB_STOP != 0) 
+      while (idx % JEL_TAB_STOP != 0) 
         row->render[idx++] = ' ';
     } else{
       row->render[idx++] = row->chars[j];
@@ -249,7 +251,7 @@ int editorRowCxToRx(erow *row, int cx){
   int j;
   for (j=0;j<cx;j++){
     if (row->chars[j] == '\t')
-      rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP);
+      rx += (JEL_TAB_STOP - 1) - (rx % JEL_TAB_STOP);
     rx++;
   }
   return rx;
@@ -533,12 +535,19 @@ void editorMoveCursor(int key){
 
 
 void editorProcessKeypress(){
+  static int quit_times = JEL_QUIT_TIMES;
   int c = editorReadKey();
 
   switch(c){
     case '\r':
       break;
     case CTRL_KEY('q'):
+      if(E.dirty && quit_times > 0){
+        editorSetStatusMessage("file unsaved 🥀. "
+          "Press ctrl-q %d more times to quit",quit_times);
+          quit_times--;
+          return;
+      }
       write(STDOUT_FILENO,"\x1b[2J",4);
       write(STDOUT_FILENO,"\x1b[H",3);
       exit(0);
