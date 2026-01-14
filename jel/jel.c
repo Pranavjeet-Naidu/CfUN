@@ -266,6 +266,20 @@ int editorRowCxToRx(erow *row, int cx){
   return rx;
 }
 
+int editorRowRxToCx(erow *row, int rx){
+  int cur_rx = 0;
+  int cx;
+  for (cx =0; cx < row->size; cx++){
+    if (row->chars[cx] == '\t')
+      cur_rx += (JEL_TAB_STOP -1) - (cur_rx % JEL_TAB_STOP);
+    cur_rx++;
+
+    if (cur_rx > rx) 
+      return cx;
+  }
+  return cx;
+}
+
 void editorRowInsertChar(erow *row, int at, int c){
   if (at < 0 || at > row->size) 
     at = row->size;
@@ -352,6 +366,7 @@ void editorDelChar(){
     E.cy--;
   }
 }
+
 /*** file i/o ***/
 char *editorRowsToString(int *buflen){
   int totlen = 0;
@@ -427,6 +442,25 @@ void editorSave(){
 
 // idea for later: write to a new, temporary file, and then rename that file to the actual file the user wants to overwrite, and they’ll carefully check for errors through the whole process.
 
+/*** find ***/
+
+void editorFind(){
+  char *query = editorPrompt("Search: %s (esc to cancel)");
+  if (query == NULL){
+    return;
+  }
+  int i;
+  for (i = 0;i < E.numrows; i++){
+    erow *row = &E.row[i];
+    char *match = strstr(row->render,query);
+    if (match){
+      E.cy = i;
+      E.cx = editorRowRxToCx(row, match - row->render);
+      E.rowoff = E.numrows;
+      break;
+    }
+  }
+}
 /*** append buffer ***/
 struct abuf{
   char *b;
@@ -646,6 +680,10 @@ void editorProcessKeypress(){
       if (E.cy < E.numrows)
         E.cx = E.row[E.cy].size;
       break;
+    
+    case CTRL_KEY('f'):
+      editorFind();
+      break;
 
     case BACKSPACE:
 
@@ -754,7 +792,7 @@ int main(int argc, char *argv[]){
     editorOpen(argv[1]);
   }
 
-  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
+  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
   
   editorSetStatusMessage("HELP: Ctrl-Q to quit");
   while (1){
