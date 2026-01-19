@@ -70,7 +70,7 @@ struct editorConfig E;
 /*** prototypes ***/
 void editorSetStatusMessage(const char *fmt, ...);
 void editorRefreshScreen();
-char *editorPrompt(char *prompt);
+char *editorPrompt(char *prompt, void (*callback)(char *, int));
 
 /*** terminal ***/
 
@@ -411,7 +411,7 @@ void editorOpen(char *filename){
 
 void editorSave(){
   if (E.filename == NULL){
-    E.filename = editorPrompt("Save as:%s(esc to cancel)");
+    E.filename = editorPrompt("Save as: %s(esc to cancel)");
     if(E.filename == NULL){
       editorSetStatusMessage("L fellow give a filename");
       return;
@@ -444,9 +444,8 @@ void editorSave(){
 
 /*** find ***/
 
-void editorFind(){
-  char *query = editorPrompt("Search: %s (esc to cancel)");
-  if (query == NULL){
+void editorFindCallback(char *query, int key){
+  if(key = '\r' || key == '\x1b'){
     return;
   }
   int i;
@@ -460,7 +459,15 @@ void editorFind(){
       break;
     }
   }
+
 }
+void editorFind(){
+  char *query = editorPrompt("Search: %s (esc to cancel)",editorFindCallback);
+  if (query == NULL){
+    free(query);
+  }
+}
+
 /*** append buffer ***/
 struct abuf{
   char *b;
@@ -669,7 +676,7 @@ void editorProcessKeypress(){
       break;
     
     case CTRL_KEY('s'):
-      editorSave();
+      ();
       break;
 
     case HOME_KEY:
@@ -731,7 +738,7 @@ void editorProcessKeypress(){
   quit_times = JEL_QUIT_TIMES; // reset back if anything other than ctrl-q is pressed
 }
 
-char *editorPrompt(char* prompt){
+char *editorPrompt(char* prompt, void (*callback)(char *, int)){
   size_t bufsize = 128;
   char*buf = malloc(bufsize);
 
@@ -749,12 +756,15 @@ char *editorPrompt(char* prompt){
     }
       else if (c == '\x1b'){
       editorSetStatusMessage("");
+      if (callback)
+        callback(buf, c);
       free(buf);
       return NULL;
-    }
-      else if (c=='\r'){
+    } else if (c=='\r'){
       if (buflen!=0){
         editorSetStatusMessage("");
+        if(callback)
+          callback(buf,c);
         return buf;
       }
     } else if (!iscntrl(c) && c < 128){
@@ -765,6 +775,9 @@ char *editorPrompt(char* prompt){
       buf[buflen++] = c;
       buf[buflen] = '\0';
     }
+
+    if (callback)
+      callback(buf,c);
   }
 }
 /*** init ***/
