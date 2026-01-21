@@ -411,7 +411,7 @@ void editorOpen(char *filename){
 
 void editorSave(){
   if (E.filename == NULL){
-    E.filename = editorPrompt("Save as: %s(esc to cancel)");
+    E.filename = editorPrompt("Save as: %s(esc to cancel)",NULL);
     if(E.filename == NULL){
       editorSetStatusMessage("L fellow give a filename");
       return;
@@ -724,7 +724,7 @@ void editorProcessKeypress(){
       break;
     
     case CTRL_KEY('s'):
-      ();
+      editorSave();
       break;
 
     case HOME_KEY:
