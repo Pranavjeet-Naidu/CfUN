@@ -329,7 +329,7 @@ void editorUpdateSyntax(erow *row){
       if(kw2) klen--;
 
       if(!strncmp(&row->render[i], keywords[j], klen) && 
-        is_separator(row->render[I + klen])){
+        is_separator(row->render[i + klen])){
           memset(&row->hl[i],kw2 ? HL_KEYWORD2: HL_KEYWORD1, klen);
           i += klen;
           break;
